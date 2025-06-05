@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%; /* white */
+  --foreground: 222.2 84% 4.9%; /* slate-900 */
+  --muted: 210 40% 96.1%; /* slate-100 */
+  --muted-foreground: 215.4 16.3% 46.9%; /* slate-500 */
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --border: 214.3 31.8% 91.4%; /* slate-200 */
+  --input: 214.3 31.8% 91.4%;
+  --primary: 142 70% 49%; /* green-500 */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%; /* slate-100 */
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 214.3 31.8% 91.4%;
+  --radius: 0.75rem;
+  --warning: 38 92% 50%; /* amber-500 */
+  --success: 142 70% 49%; /* green-500 */
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --primary: 142 70% 49%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 217.2 32.6% 17.5%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    @apply antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom color utilities */
+.text-primary {
+  color: hsl(var(--primary));
+}
+
+.bg-primary {
+  background-color: hsl(var(--primary));
+}
+
+.hover\:bg-primary:hover {
+  background-color: hsl(var(--primary) / 0.9);
+}
+
+.border-primary {
+  border-color: hsl(var(--primary));
+}
+
+.text-success {
+  color: hsl(var(--success));
+}
+
+.bg-success {
+  background-color: hsl(var(--success));
+}
+
+.text-warning {
+  color: hsl(var(--warning));
+}
+
+.bg-warning {
+  background-color: hsl(var(--warning));
+}
+
+.text-danger {
+  color: hsl(var(--destructive));
+}
+
+.bg-danger {
+  background-color: hsl(var(--destructive));
+}
+
+.text-secondary {
+  color: hsl(var(--secondary-foreground));
+}
+
+.bg-secondary {
+  background-color: hsl(var(--secondary));
+}
+
+/* Progress bar colors */
+.progress-success {
+  background-color: hsl(var(--success));
+}
+
+.progress-warning {
+  background-color: hsl(var(--warning));
+}
+
+.progress-blue {
+  background-color: hsl(var(--primary));
+}
