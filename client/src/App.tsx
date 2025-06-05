@@ -8,6 +8,7 @@ import CropDetail from "@/pages/crop-detail";
 import Login from "@/pages/login";
 import AuthGuard from "@/components/auth-guard";
 import NotFound from "@/pages/not-found";
+import GrowAreasPage from "@/pages/grow-areas";
 
 // Add authorization header to all requests
 queryClient.setDefaultOptions({
@@ -32,7 +33,7 @@ queryClient.setDefaultOptions({
         const text = (await res.text()) || res.statusText;
         throw new Error(`${res.status}: ${text}`);
       }
-      
+
       return await res.json();
     },
   },
@@ -43,6 +44,11 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/crop/:id" component={CropDetail} />
+      <Route path="/grow-areas">
+        <AuthGuard>
+          <GrowAreasPage />
+        </AuthGuard>
+      </Route>
       <Route path="/">
         <AuthGuard>
           <Dashboard />

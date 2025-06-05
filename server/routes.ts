@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 
 const authenticateSession = async (req: any, res: any, next: any) => {
   const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  
+
   if (!sessionToken) {
     return res.status(401).json({ message: "No session token provided" });
   }
@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { password } = req.body;
-      
+
       if (password !== (process.env.SHARED_PASSWORD || "growtrack2024")) {
         return res.status(401).json({ message: "Invalid password" });
       }
@@ -64,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crops = await storage.getCrops();
       res.json(crops);
     } catch (error) {
+      console.error("Error fetching crops:", error); // <-- Add this line
       res.status(500).json({ message: "Failed to fetch crops" });
     }
   });
@@ -72,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const crop = await storage.getCropById(id);
-      
+
       if (!crop) {
         return res.status(404).json({ message: "Crop not found" });
       }
@@ -101,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updateData = req.body;
-      
+
       const crop = await storage.updateCrop(id, updateData);
       if (!crop) {
         return res.status(404).json({ message: "Crop not found" });
@@ -117,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteCrop(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Crop not found" });
       }
@@ -146,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         cropId: id,
       });
-      
+
       const event = await storage.createEvent(eventData);
       res.status(201).json(event);
     } catch (error) {
@@ -154,6 +155,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid event data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  // Grow Areas endpoints
+  app.get("/api/grow-areas", authenticateSession, async (req, res) => {
+    try {
+      const areas = await storage.getGrowAreas();
+      res.json(areas);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch grow areas" });
+    }
+  });
+
+  app.post("/api/grow-areas", authenticateSession, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ message: "Name is required" });
+      const area = await storage.createGrowArea({ name });
+      res.status(201).json(area);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create grow area" });
+    }
+  });
+
+  app.patch("/api/grow-areas/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+      const area = await storage.updateGrowArea(id, { name });
+      if (!area) return res.status(404).json({ message: "Grow area not found" });
+      res.json(area);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update grow area" });
+    }
+  });
+
+  app.delete("/api/grow-areas/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteGrowArea(id);
+      if (!deleted) return res.status(404).json({ message: "Grow area not found" });
+      res.json({ message: "Grow area deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete grow area" });
+    }
+  });
+
+  // Subareas endpoints
+  app.get("/api/grow-areas/:growAreaId/subareas", authenticateSession, async (req, res) => {
+    try {
+      const { growAreaId } = req.params;
+      const subs = await storage.getSubareas(growAreaId);
+      res.json(subs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subareas" });
+    }
+  });
+
+  app.post("/api/grow-areas/:growAreaId/subareas", authenticateSession, async (req, res) => {
+    try {
+      const { growAreaId } = req.params;
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ message: "Name is required" });
+      const sub = await storage.createSubarea({ name, growAreaId });
+      res.status(201).json(sub);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create subarea" });
+    }
+  });
+
+  app.patch("/api/subareas/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+      const sub = await storage.updateSubarea(id, { name });
+      if (!sub) return res.status(404).json({ message: "Subarea not found" });
+      res.json(sub);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update subarea" });
+    }
+  });
+
+  app.delete("/api/subareas/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSubarea(id);
+      if (!deleted) return res.status(404).json({ message: "Subarea not found" });
+      res.json({ message: "Subarea deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete subarea" });
     }
   });
 

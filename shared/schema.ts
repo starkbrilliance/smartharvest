@@ -3,11 +3,25 @@ import { createInsertSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
 
+export const growAreas = pgTable("grow_areas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const subareas = pgTable("subareas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  growAreaId: uuid("grow_area_id").notNull().references(() => growAreas.id),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const crops = pgTable("crops", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   variety: text("variety"),
-  location: text("location").notNull(), // e.g., "Tent 1, Shelf 2" or "Tent 2, Floor"
+  // location: text("location").notNull(), // DEPRECATED: replaced by subareaId
+  subareaId: uuid("subarea_id").references(() => subareas.id),
   plantedDate: timestamp("planted_date").notNull(),
   expectedHarvestDate: timestamp("expected_harvest_date").notNull(),
   actualHarvestDate: timestamp("actual_harvest_date"),
@@ -35,8 +49,24 @@ export const sessions = pgTable("sessions", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
-export const cropsRelations = relations(crops, ({ many }) => ({
+export const growAreasRelations = relations(growAreas, ({ many }) => ({
+  subareas: many(subareas),
+}));
+
+export const subareasRelations = relations(subareas, ({ one, many }) => ({
+  growArea: one(growAreas, {
+    fields: [subareas.growAreaId],
+    references: [growAreas.id],
+  }),
+  crops: many(crops),
+}));
+
+export const cropsRelations = relations(crops, ({ many, one }) => ({
   events: many(events),
+  subarea: one(subareas, {
+    fields: [crops.subareaId],
+    references: [subareas.id],
+  }),
 }));
 
 export const eventsRelations = relations(events, ({ one }) => ({
@@ -58,6 +88,7 @@ export const insertCropSchema = baseCropSchema.extend({
   plantedDate: z.string().transform((str) => new Date(str)),
   expectedHarvestDate: z.string().transform((str) => new Date(str)),
   actualHarvestDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
+  subareaId: z.string().uuid().optional().or(z.literal("")).or(z.null()),
 });
 
 const baseEventSchema = createInsertSchema(events).omit({

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,11 @@ export default function Dashboard() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isAddCropModalOpen, setIsAddCropModalOpen] = useState(false);
-  
+  const [selectedGrowArea, setSelectedGrowArea] = useState<any>(null);
+  const [growAreas, setGrowAreas] = useState<any[]>([]);
+  const [subareas, setSubareas] = useState<any[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -28,6 +32,40 @@ export default function Dashboard() {
   const { data: crops = [], isLoading } = useQuery<Crop[]>({
     queryKey: ["/api/crops"],
   });
+
+  // Fetch grow areas and subareas
+  useEffect(() => {
+    const fetchGrowAreas = async () => {
+      setLoadingAreas(true);
+      try {
+        const res = await apiRequest("GET", "/api/grow-areas");
+        const areas = await res.json();
+        setGrowAreas(areas);
+        setLoadingAreas(false);
+      } catch (err) {
+        setGrowAreas([]);
+        setLoadingAreas(false);
+      }
+    };
+    fetchGrowAreas();
+  }, []);
+
+  // Fetch subareas for all grow areas (for filtering)
+  useEffect(() => {
+    const fetchAllSubareas = async () => {
+      if (!growAreas.length) return setSubareas([]);
+      let allSubs: any[] = [];
+      for (const area of growAreas) {
+        try {
+          const res = await apiRequest("GET", `/api/grow-areas/${area.id}/subareas`);
+          const subs = await res.json();
+          allSubs = allSubs.concat(subs.map((s: any) => ({ ...s, growAreaId: area.id })));
+        } catch {}
+      }
+      setSubareas(allSubs);
+    };
+    fetchAllSubareas();
+  }, [growAreas]);
 
   const harvestMutation = useMutation({
     mutationFn: async (cropId: string) => {
@@ -85,12 +123,14 @@ export default function Dashboard() {
     }
   };
 
-  const filteredCrops = currentView === "overview" 
-    ? crops 
+  // Dynamic filtering
+  const filteredCrops = currentView === "overview"
+    ? crops
     : crops.filter(crop => {
-        if (currentView === "tent1") return crop.location.includes("Tent 1");
-        if (currentView === "tent2") return crop.location.includes("Tent 2");
-        return true;
+        // Find the subarea for this crop
+        const sub = subareas.find(s => s.id === crop.subareaId);
+        // Only show crops whose subarea belongs to the selected grow area
+        return sub && sub.growAreaId === currentView;
       });
 
   const urgentTasks = crops.filter(crop => {
@@ -129,7 +169,7 @@ export default function Dashboard() {
                   </Badge>
                 )}
               </Button>
-              <Button 
+              <Button
                 className="bg-primary text-white hover:bg-green-600"
                 onClick={() => setIsAddCropModalOpen(true)}
               >
@@ -148,21 +188,28 @@ export default function Dashboard() {
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
-            {[
-              { id: "overview", label: "Overview", icon: "📊" },
-              { id: "tent1", label: "Tent 1 (Shelves)", icon: "🏠" },
-              { id: "tent2", label: "Tent 2 (Floor)", icon: "🏪" },
-            ].map((tab) => (
+            <button
+              key="overview"
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                currentView === "overview"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setCurrentView("overview")}
+            >
+              Overview
+            </button>
+            {growAreas.map((area) => (
               <button
-                key={tab.id}
+                key={area.id}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  currentView === tab.id
+                  currentView === area.id
                     ? "border-primary text-primary"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
-                onClick={() => setCurrentView(tab.id)}
+                onClick={() => setCurrentView(area.id)}
               >
-                {tab.label}
+                {area.name}
               </button>
             ))}
           </div>
@@ -188,7 +235,13 @@ export default function Dashboard() {
                       <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
                       <div>
                         <p className="font-medium text-gray-900">
-                          Harvest {crop.name} - {crop.location}
+                          Harvest {crop.name}
+                          {(() => {
+                            const sub = subareas.find(s => s.id === crop.subareaId);
+                            if (!sub) return "";
+                            const area = growAreas.find(a => a.id === sub.growAreaId);
+                            return ` (${area ? area.name + ' / ' : ''}${sub.name})`;
+                          })()}
                         </p>
                         <p className="text-sm text-gray-600">Overdue</p>
                       </div>
@@ -226,7 +279,7 @@ export default function Dashboard() {
             <Sprout className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No crops found</h3>
             <p className="text-gray-600 mb-4">Start by adding your first crop to begin tracking.</p>
-            <Button 
+            <Button
               className="bg-primary text-white hover:bg-green-600"
               onClick={() => setIsAddCropModalOpen(true)}
             >
@@ -251,13 +304,13 @@ export default function Dashboard() {
         onClose={() => setIsEventModalOpen(false)}
         crop={selectedCrop}
       />
-      
+
       <QRModal
         isOpen={isQRModalOpen}
         onClose={() => setIsQRModalOpen(false)}
         crop={selectedCrop}
       />
-      
+
       <AddCropModal
         isOpen={isAddCropModalOpen}
         onClose={() => setIsAddCropModalOpen(false)}

@@ -1,13 +1,15 @@
-import { 
-  crops, 
-  events, 
+import {
+  crops,
+  events,
   sessions,
-  type Crop, 
+  type Crop,
   type InsertCrop,
   type Event,
   type InsertEvent,
   type Session,
-  type InsertSession
+  type InsertSession,
+  growAreas,
+  subareas
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte } from "drizzle-orm";
@@ -19,15 +21,29 @@ export interface IStorage {
   createCrop(crop: InsertCrop): Promise<Crop>;
   updateCrop(id: string, crop: Partial<InsertCrop>): Promise<Crop | undefined>;
   deleteCrop(id: string): Promise<boolean>;
-  
+
   // Events
   getEventsByCropId(cropId: string): Promise<Event[]>;
   createEvent(event: InsertEvent): Promise<Event>;
-  
+
   // Authentication
   createSession(session: InsertSession): Promise<Session>;
   getSessionByToken(token: string): Promise<Session | undefined>;
   deleteSession(token: string): Promise<boolean>;
+
+  // Grow Areas
+  getGrowAreas(): Promise<any[]>;
+  getGrowAreaById(id: string): Promise<any | undefined>;
+  createGrowArea(data: { name: string }): Promise<any>;
+  updateGrowArea(id: string, data: { name: string }): Promise<any | undefined>;
+  deleteGrowArea(id: string): Promise<boolean>;
+
+  // Subareas
+  getSubareas(growAreaId: string): Promise<any[]>;
+  getSubareaById(id: string): Promise<any | undefined>;
+  createSubarea(data: { name: string, growAreaId: string }): Promise<any>;
+  updateSubarea(id: string, data: { name: string }): Promise<any | undefined>;
+  deleteSubarea(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -105,6 +121,54 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sessions.sessionToken, token))
       .returning();
     return !!session;
+  }
+
+  async getGrowAreas(): Promise<any[]> {
+    return await db.select().from(growAreas);
+  }
+
+  async getGrowAreaById(id: string): Promise<any | undefined> {
+    const [area] = await db.select().from(growAreas).where(eq(growAreas.id, id));
+    return area || undefined;
+  }
+
+  async createGrowArea(data: { name: string }): Promise<any> {
+    const [area] = await db.insert(growAreas).values({ name: data.name }).returning();
+    return area;
+  }
+
+  async updateGrowArea(id: string, data: { name: string }): Promise<any | undefined> {
+    const [area] = await db.update(growAreas).set({ name: data.name }).where(eq(growAreas.id, id)).returning();
+    return area || undefined;
+  }
+
+  async deleteGrowArea(id: string): Promise<boolean> {
+    const [area] = await db.delete(growAreas).where(eq(growAreas.id, id)).returning();
+    return !!area;
+  }
+
+  async getSubareas(growAreaId: string): Promise<any[]> {
+    return await db.select().from(subareas).where(eq(subareas.growAreaId, growAreaId));
+  }
+
+  async getSubareaById(id: string): Promise<any | undefined> {
+    const [sub] = await db.select().from(subareas).where(eq(subareas.id, id));
+    return sub || undefined;
+  }
+
+  async createSubarea(data: { name: string, growAreaId: string }): Promise<any> {
+    const [sub] = await db.insert(subareas).values(data).returning();
+    return sub;
+  }
+
+  async updateSubarea(id: string, data: { name: string }): Promise<any | undefined> {
+    const [sub] = await db.update(subareas).set({ name: data.name }).where(eq(subareas.id, id)).returning();
+    return sub || undefined;
+  }
+
+  async deleteSubarea(id: string): Promise<boolean> {
+    const [sub] = await db.delete(subareas).where(eq(subareas.id, id)).returning();
+    return !!sub;
   }
 }
 
