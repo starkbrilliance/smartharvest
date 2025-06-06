@@ -43,6 +43,11 @@ interface AISuggestion {
   growingDays: number;
   specialInstructions: string;
   commonIssues: string[];
+  maintenanceSchedule: {
+    eventType: string;
+    frequency: string;
+    notes: string;
+  }[];
 }
 
 interface AISuggestionsResponse {
@@ -302,7 +307,6 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
   });
 
   const onSubmit = (data: AddCropFormData) => {
-    // Map cropName to name for backend compatibility
     console.log("Submitting crop:", data);
     const mutationData = {
       name: data.cropName,
@@ -313,7 +317,8 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
       expectedHarvestDate: data.expectedHarvestDate,
       status: data.status,
       notes: data.notes,
-      areaId: selectedAreaId
+      areaId: selectedAreaId,
+      maintenanceSchedule: data.maintenanceSchedule || []
     };
 
     createCropMutation.mutate(mutationData);
@@ -336,8 +341,8 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
       cropName,
       variety,
       context,
-      allFormValues: watch(), // Log all form values
-      contextField: (document.getElementById('context') as HTMLInputElement)?.value // Log raw input value
+      allFormValues: watch(),
+      contextField: (document.getElementById('context') as HTMLInputElement)?.value
     });
     if (!cropName || !variety) return;
     setVarietyLoading(true);
@@ -346,6 +351,7 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
       const dbRes = await apiRequest("GET", `/api/crop-templates/search?q=${encodeURIComponent(cropName)}`);
       const dbTemplates: CropTemplate[] = await dbRes.json();
       const dbMatch = dbTemplates.find(t => t.name.toLowerCase() === cropName.toLowerCase() && t.variety.toLowerCase() === variety.toLowerCase());
+
       // Fetch from AI (new advice endpoint)
       const aiRes = await apiRequest(
         "GET",
@@ -353,16 +359,22 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
       );
       console.log('Advice API call params:', { cropName, variety, context });
       const aiData = await aiRes.json();
+
       // Prefer DB, fallback to AI
       let notes = "";
       let growingDays: number | undefined;
+      let maintenanceSchedule: AISuggestion['maintenanceSchedule'] = [];
+
       if (dbMatch) {
         notes = dbMatch.specialInstructions || "";
         growingDays = dbMatch.growingDays;
+        maintenanceSchedule = dbMatch.maintenanceSchedule || [];
       } else if (aiData) {
         notes = aiData.specialInstructions || "";
         growingDays = aiData.growingDays;
+        maintenanceSchedule = aiData.maintenanceSchedule || [];
       }
+
       if (notes) setValue("notes", notes);
       if (growingDays && typeof growingDays === 'number') {
         const plantedDateStr = watch("plantedDate");
@@ -373,6 +385,16 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
             harvestDate.setDate(plantedDate.getDate() + growingDays);
             const iso = harvestDate.toISOString();
             if (iso && typeof iso === 'string') setValue("expectedHarvestDate", iso.split('T')[0]);
+
+            // Create maintenance schedules based on the growing period
+            if (maintenanceSchedule.length > 0) {
+              const schedules = maintenanceSchedule.map(schedule => ({
+                ...schedule,
+                startDate: plantedDate.toISOString(),
+                endDate: harvestDate.toISOString(),
+              }));
+              setValue("maintenanceSchedule", schedules);
+            }
           } catch {}
         }
       }

@@ -9,7 +9,7 @@ export async function getCropAdvice({ cropName, variety, context }: { cropName: 
   console.log('context', context);
 
   const systemPrompt = `You are a highly knowledgeable gardening assistant. Given a crop name, variety, and context (such as 'microgreens', 'field', 'hydroponic'), respond ONLY with valid minified JSON (no markdown, no explanation, no comments) in the following structure:
-{"growingDays": number,"specialInstructions": "...","commonIssues": ["..."]}
+{"growingDays": number,"specialInstructions": "...","commonIssues": ["..."],"maintenanceSchedule": [{"eventType": string,"frequency": string,"notes": string}]}
 
 Adjust your answer based on context — for example, growing microgreens hydroponically requires different timing and care than growing mature crops in soil.
 
@@ -17,18 +17,17 @@ EXAMPLES:
 Input: Crop: Peas
 Variety: Sugar Snap
 Context: field
-Output: {"growingDays":65,"specialInstructions":"Direct sow in early spring. Provide trellis support. Keep soil moist. Harvest when pods are plump.","commonIssues":["Powdery mildew","Aphids"]}
+Output: {"growingDays":65,"specialInstructions":"Direct sow in early spring. Provide trellis support. Keep soil moist. Harvest when pods are plump.","commonIssues":["Powdery mildew","Aphids"],"maintenanceSchedule":[{"eventType":"watering","frequency":"daily","notes":"Water deeply in the morning"},{"eventType":"inspection","frequency":"every_3_days","notes":"Check for pests and disease"},{"eventType":"fertilizing","frequency":"weekly","notes":"Apply balanced fertilizer"}]}
 
 Input: Crop: Basil
 Variety: Genovese
 Context: hydroponic
-Output: {"growingDays":28,"specialInstructions":"Maintain water temp 20-25C, provide 14+ hours of light, harvest leaves regularly to encourage growth.","commonIssues":["Root rot","Downy mildew"]}
+Output: {"growingDays":28,"specialInstructions":"Maintain water temp 20-25C, provide 14+ hours of light, harvest leaves regularly to encourage growth.","commonIssues":["Root rot","Downy mildew"],"maintenanceSchedule":[{"eventType":"watering","frequency":"daily","notes":"Check nutrient solution levels"},{"eventType":"inspection","frequency":"daily","notes":"Monitor for root health and leaf color"},{"eventType":"fertilizing","frequency":"weekly","notes":"Top up nutrient solution"}]}
 
 Input: Crop: Peas
 Variety: Dun
 Context: hydroponic microgreens
-Output: {"growingDays":10,"specialInstructions":"Soak seeds overnight, spread densely on moist grow mat or medium, keep in dark for 3 days then expose to light, harvest shoots when 2-3 inches tall.","commonIssues":["Mold","Overwatering"]}
-`;
+Output: {"growingDays":10,"specialInstructions":"Soak seeds overnight, spread densely on moist grow mat or medium, keep in dark for 3 days then expose to light, harvest shoots when 2-3 inches tall.","commonIssues":["Mold","Overwatering"],"maintenanceSchedule":[{"eventType":"watering","frequency":"daily","notes":"Mist with clean water"},{"eventType":"inspection","frequency":"daily","notes":"Check for mold and proper growth"},{"eventType":"fertilizing","frequency":"every_2_days","notes":"Apply diluted nutrient solution"}]}`;
 
   const userPrompt = `Crop: ${cropName}\nVariety: ${variety}\nContext: ${context || ""}`;
 

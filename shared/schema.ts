@@ -1,4 +1,5 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -31,10 +32,11 @@ export const crops = pgTable("crops", {
   imageUrl: text("image_url"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  maintenanceSchedule: jsonb("maintenance_schedule").notNull().default("[]"),
 });
 
 export const events = pgTable("events", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().default(sql`nextval('events_id_seq')`),
   cropId: uuid("crop_id").notNull().references(() => crops.id),
   type: text("type").notNull(), // watering, fertilizing, pruning, inspection, treatment, harvest, other
   notes: text("notes"),
@@ -43,19 +45,32 @@ export const events = pgTable("events", {
 });
 
 export const sessions = pgTable("sessions", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().default(sql`nextval('sessions_id_seq')`),
   sessionToken: text("session_token").notNull().unique(),
   isAuthenticated: boolean("is_authenticated").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
 });
 
+export const maintenanceSchedules = pgTable("maintenance_schedules", {
+  id: integer("id").primaryKey().default(sql`nextval('maintenance_schedules_id_seq')`),
+  cropId: uuid("crop_id").notNull().references(() => crops.id),
+  eventType: text("type").notNull(), // watering, fertilizing, pruning, inspection, treatment
+  frequency: text("frequency").notNull(), // daily, weekly, every_3_days, etc.
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const cropTemplates = pgTable("crop_templates", {
-  id: uuid("id").defaultRandom().primaryKey(),
+  id: integer("id").primaryKey().default(sql`nextval('crop_templates_id_seq')`),
   name: text("name").notNull(),
   variety: text("variety").notNull(),
   growingDays: integer("growing_days").notNull(),
   specialInstructions: text("special_instructions"),
+  maintenanceSchedule: jsonb("maintenance_schedule").notNull().default("[]"), // Array of maintenance events
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -90,6 +105,13 @@ export const cropTemplatesRelations = relations(cropTemplates, ({ many }) => ({
   crops: many(crops),
 }));
 
+export const maintenanceSchedulesRelations = relations(maintenanceSchedules, ({ one }) => ({
+  crop: one(crops, {
+    fields: [maintenanceSchedules.cropId],
+    references: [crops.id],
+  }),
+}));
+
 // Base schema from drizzle
 const baseCropSchema = createInsertSchema(crops).omit({
   id: true,
@@ -104,6 +126,13 @@ export const insertCropSchema = baseCropSchema.extend({
   actualHarvestDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
   subareaId: z.string().uuid().optional().or(z.literal("")).or(z.null()),
   areaId: z.string().uuid().optional(),
+  maintenanceSchedule: z.array(z.object({
+    eventType: z.string(),
+    frequency: z.string(),
+    notes: z.string().optional(),
+    startDate: z.string().transform((str) => new Date(str)),
+    endDate: z.string().transform((str) => new Date(str)),
+  })).optional(),
 });
 
 const baseEventSchema = createInsertSchema(events).omit({
@@ -118,6 +147,15 @@ export const insertEventSchema = baseEventSchema.extend({
 export const insertSessionSchema = createInsertSchema(sessions).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertMaintenanceScheduleSchema = createInsertSchema(maintenanceSchedules).omit({
+  id: true,
+  createdAt: true,
+  isActive: true,
+}).extend({
+  startDate: z.string().transform((str) => new Date(str)),
+  endDate: z.string().transform((str) => new Date(str)),
 });
 
 export type InsertCrop = z.infer<typeof insertCropSchema>;

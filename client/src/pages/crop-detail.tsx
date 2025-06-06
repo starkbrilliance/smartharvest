@@ -14,6 +14,7 @@ import type { Crop, Event } from "@shared/schema";
 import { getDaysUntilHarvest, getDaysSincePlanted, getGrowthProgress, getStatusColor, formatDateTime } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import MaintenanceSchedule from "@/components/maintenance-schedule";
 
 export default function CropDetail() {
   const [, params] = useRoute("/crop/:id");
@@ -101,6 +102,27 @@ export default function CropDetail() {
   const handleDelete = () => {
     if (!cropData) return;
     deleteMutation.mutate(cropData.id);
+  };
+
+  const handleCompleteMaintenanceEvent = async (event: any) => {
+    try {
+      await apiRequest("POST", `/api/crops/${cropData?.id}/events`, {
+        type: event.eventType,
+        notes: event.notes || `Completed scheduled ${event.eventType}`,
+        eventDate: new Date().toISOString(),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crops", cropData?.id] });
+      toast({
+        title: "Event Logged",
+        description: "Maintenance event has been recorded",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log maintenance event. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -263,7 +285,7 @@ export default function CropDetail() {
 
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-gray-400"
                   onClick={() => setIsEventModalOpen(true)}
                 >
                   <Clipboard className="h-4 w-4 mr-2" />
@@ -295,6 +317,13 @@ export default function CropDetail() {
                   />
                 </CardContent>
               </Card>
+            )}
+
+            {cropData?.maintenanceSchedule && cropData.maintenanceSchedule.length > 0 && (
+              <MaintenanceSchedule
+                events={cropData.maintenanceSchedule}
+                onCompleteEvent={handleCompleteMaintenanceEvent}
+              />
             )}
           </div>
         </div>
