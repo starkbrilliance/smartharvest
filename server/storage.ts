@@ -2,6 +2,7 @@ import {
   crops,
   events,
   sessions,
+  cropTemplates,
   type Crop,
   type InsertCrop,
   type Event,
@@ -12,7 +13,7 @@ import {
   subareas
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // Crops
@@ -44,11 +45,42 @@ export interface IStorage {
   createSubarea(data: { name: string, growAreaId: string }): Promise<any>;
   updateSubarea(id: string, data: { name: string }): Promise<any | undefined>;
   deleteSubarea(id: string): Promise<boolean>;
+
+  // Crop Templates
+  getCropTemplates(): Promise<any[]>;
+  getCropTemplateById(id: string): Promise<any | undefined>;
+  createCropTemplate(data: { name: string; variety: string; growingDays: number; specialInstructions?: string }): Promise<any>;
+  updateCropTemplate(id: string, data: { name?: string; variety?: string; growingDays?: number; specialInstructions?: string }): Promise<any | undefined>;
+  deleteCropTemplate(id: string): Promise<boolean>;
+  searchCropTemplates(query: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getCrops(): Promise<Crop[]> {
-    return await db.select().from(crops).where(eq(crops.isActive, true)).orderBy(desc(crops.createdAt));
+    try {
+      return await db
+        .select({
+          id: crops.id,
+          name: crops.name,
+          variety: crops.variety,
+          subareaId: crops.subareaId,
+          areaId: crops.areaId,
+          plantedDate: crops.plantedDate,
+          expectedHarvestDate: crops.expectedHarvestDate,
+          actualHarvestDate: crops.actualHarvestDate,
+          status: crops.status,
+          notes: crops.notes,
+          imageUrl: crops.imageUrl,
+          isActive: crops.isActive,
+          createdAt: crops.createdAt
+        })
+        .from(crops)
+        .where(eq(crops.isActive, true))
+        .orderBy(desc(crops.createdAt));
+    } catch (error) {
+      console.error("Database error in getCrops:", error);
+      throw error;
+    }
   }
 
   async getCropById(id: string): Promise<Crop | undefined> {
@@ -169,6 +201,53 @@ export class DatabaseStorage implements IStorage {
   async deleteSubarea(id: string): Promise<boolean> {
     const [sub] = await db.delete(subareas).where(eq(subareas.id, id)).returning();
     return !!sub;
+  }
+
+  async getCropTemplates(): Promise<any[]> {
+    return await db.select().from(cropTemplates);
+  }
+
+  async getCropTemplateById(id: string): Promise<any | undefined> {
+    const [template] = await db.select().from(cropTemplates).where(eq(cropTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createCropTemplate(data: { name: string; variety: string; growingDays: number; specialInstructions?: string }): Promise<any> {
+    const [template] = await db
+      .insert(cropTemplates)
+      .values(data)
+      .returning();
+    return template;
+  }
+
+  async updateCropTemplate(id: string, data: { name?: string; variety?: string; growingDays?: number; specialInstructions?: string }): Promise<any | undefined> {
+    const [template] = await db
+      .update(cropTemplates)
+      .set(data)
+      .where(eq(cropTemplates.id, id))
+      .returning();
+    return template || undefined;
+  }
+
+  async deleteCropTemplate(id: string): Promise<boolean> {
+    const [template] = await db
+      .delete(cropTemplates)
+      .where(eq(cropTemplates.id, id))
+      .returning();
+    return !!template;
+  }
+
+  async searchCropTemplates(query: string): Promise<any[]> {
+    const searchQuery = `%${query.toLowerCase()}%`;
+    return await db
+      .select()
+      .from(cropTemplates)
+      .where(
+        or(
+          ilike(cropTemplates.name, searchQuery),
+          ilike(cropTemplates.variety, searchQuery)
+        )
+      );
   }
 }
 

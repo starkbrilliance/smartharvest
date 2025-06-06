@@ -22,6 +22,7 @@ export const crops = pgTable("crops", {
   variety: text("variety"),
   // location: text("location").notNull(), // DEPRECATED: replaced by subareaId
   subareaId: uuid("subarea_id").references(() => subareas.id),
+  areaId: uuid("area_id").references(() => growAreas.id),
   plantedDate: timestamp("planted_date").notNull(),
   expectedHarvestDate: timestamp("expected_harvest_date").notNull(),
   actualHarvestDate: timestamp("actual_harvest_date"),
@@ -47,6 +48,15 @@ export const sessions = pgTable("sessions", {
   isAuthenticated: boolean("is_authenticated").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const cropTemplates = pgTable("crop_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  variety: text("variety").notNull(),
+  growingDays: integer("growing_days").notNull(),
+  specialInstructions: text("special_instructions"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const growAreasRelations = relations(growAreas, ({ many }) => ({
@@ -76,6 +86,10 @@ export const eventsRelations = relations(events, ({ one }) => ({
   }),
 }));
 
+export const cropTemplatesRelations = relations(cropTemplates, ({ many }) => ({
+  crops: many(crops),
+}));
+
 // Base schema from drizzle
 const baseCropSchema = createInsertSchema(crops).omit({
   id: true,
@@ -89,6 +103,7 @@ export const insertCropSchema = baseCropSchema.extend({
   expectedHarvestDate: z.string().transform((str) => new Date(str)),
   actualHarvestDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
   subareaId: z.string().uuid().optional().or(z.literal("")).or(z.null()),
+  areaId: z.string().uuid().optional(),
 });
 
 const baseEventSchema = createInsertSchema(events).omit({

@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -13,15 +13,49 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCropSchema } from "@shared/schema";
 import { z } from "zod";
 import { useLocation } from "wouter";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const addCropSchema = insertCropSchema.extend({
   cropName: z.string().min(1, "Crop name is required"),
   plantedDate: z.string().min(1, "Planted date is required"),
   expectedHarvestDate: z.string().min(1, "Expected harvest date is required"),
-  subareaId: z.string().optional().or(z.literal("")),
+  subareaId: z.string().nullable(),
+  context: z.string().optional(),
+  variety: z.string().optional(),
 });
 
 type AddCropFormData = z.infer<typeof addCropSchema>;
+
+interface CropTemplate {
+  id: string;
+  name: string;
+  variety: string;
+  growingDays: number;
+  specialInstructions?: string;
+}
+
+interface AISuggestion {
+  name: string;
+  varieties: string[];
+  growingDays: number;
+  specialInstructions: string;
+  commonIssues: string[];
+}
+
+interface AISuggestionsResponse {
+  suggestions: AISuggestion[];
+}
+
+interface CropSuggestion {
+  name: string;
+  variety: string;
+  growingDays: number;
+  specialInstructions: string;
+  isAISuggestion: boolean;
+}
 
 interface AddCropModalProps {
   isOpen: boolean;
@@ -32,6 +66,15 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [varietyOptions, setVarietyOptions] = useState<string[]>([]);
+  const [varietyLoading, setVarietyLoading] = useState(false);
+  const [showVarietyDropdown, setShowVarietyDropdown] = useState(false);
+  const varietyInputRef = useRef<HTMLInputElement | null>(null);
+  const [varietyInput, setVarietyInput] = useState("");
+  const [varietyPopoverOpen, setVarietyPopoverOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   const {
     register,
@@ -48,6 +91,8 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
       plantedDate: new Date().toISOString().split('T')[0],
       expectedHarvestDate: "",
       subareaId: "",
+      context: "",
+      variety: "",
     },
   });
 
@@ -62,6 +107,68 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
   const [newAreaName, setNewAreaName] = useState("");
   const [addingSubarea, setAddingSubarea] = useState(false);
   const [newSubareaName, setNewSubareaName] = useState("");
+
+  // Fetch crop templates based on search query
+  const { data: cropTemplates = [] } = useQuery<CropTemplate[]>({
+    queryKey: ["/api/crop-templates/search", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return [];
+      const res = await apiRequest("GET", `/api/crop-templates/search?q=${encodeURIComponent(searchQuery)}`);
+      return res.json();
+    },
+    enabled: !!searchQuery,
+  });
+
+  // Fetch AI suggestions based on search query
+  const { data: aiSuggestions } = useQuery<AISuggestionsResponse>({
+    queryKey: ["/api/crop-templates/ai-suggestions", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return { suggestions: [] };
+      const res = await apiRequest("GET", `/api/crop-templates/ai-suggestions?q=${encodeURIComponent(searchQuery)}`);
+      return res.json();
+    },
+    enabled: !!searchQuery,
+  });
+
+  // Combine database templates with AI suggestions
+  const allSuggestions = useMemo(() => {
+    const dbTemplates: CropSuggestion[] = cropTemplates.map(t => ({
+      name: t.name,
+      variety: t.variety,
+      growingDays: t.growingDays,
+      specialInstructions: t.specialInstructions || "",
+      isAISuggestion: false
+    }));
+
+    const aiTemplates: CropSuggestion[] = (aiSuggestions?.suggestions || []).map(s => ({
+      name: s.name,
+      variety: s.varieties[0], // Use first variety as default
+      growingDays: s.growingDays,
+      specialInstructions: s.specialInstructions,
+      isAISuggestion: true
+    }));
+
+    return [...dbTemplates, ...aiTemplates];
+  }, [cropTemplates, aiSuggestions]);
+
+  // Auto-populate form when a template is selected
+  const handleTemplateSelect = (template: CropSuggestion) => {
+    setValue("cropName", template.name);
+    setValue("variety", template.variety);
+
+    // Calculate expected harvest date based on growing days
+    const plantedDate = new Date(watch("plantedDate"));
+    const harvestDate = new Date(plantedDate);
+    harvestDate.setDate(plantedDate.getDate() + template.growingDays);
+    setValue("expectedHarvestDate", (harvestDate.toISOString().split('T')[0]) ?? "");
+
+    // Add special instructions to notes
+    if (template.specialInstructions) {
+      setValue("notes", template.specialInstructions);
+    }
+
+    setOpen(false);
+  };
 
   // Fetch grow areas on open
   useEffect(() => {
@@ -197,11 +304,19 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
   const onSubmit = (data: AddCropFormData) => {
     // Map cropName to name for backend compatibility
     console.log("Submitting crop:", data);
-    createCropMutation.mutate({
-      ...data,
+    const mutationData = {
       name: data.cropName,
-      subareaId: selectedSubareaId || undefined,
-    });
+      cropName: data.cropName,
+      variety: data.variety,
+      subareaId: selectedSubareaId || null,
+      plantedDate: data.plantedDate,
+      expectedHarvestDate: data.expectedHarvestDate,
+      status: data.status,
+      notes: data.notes,
+      areaId: selectedAreaId
+    };
+
+    createCropMutation.mutate(mutationData);
   };
 
   // Debug: log form errors
@@ -210,6 +325,62 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  // Fetch notes and expected harvest date when both crop name and variety are blurred
+  const handleNameOrVarietyBlur = async () => {
+    const cropName = watch("cropName")?.trim() || "";
+    const variety = watch("variety")?.trim() || "";
+    const context = watch("context")?.trim() || "";
+    console.log('Form values on blur:', {
+      cropName,
+      variety,
+      context,
+      allFormValues: watch(), // Log all form values
+      contextField: (document.getElementById('context') as HTMLInputElement)?.value // Log raw input value
+    });
+    if (!cropName || !variety) return;
+    setVarietyLoading(true);
+    try {
+      // Fetch from DB
+      const dbRes = await apiRequest("GET", `/api/crop-templates/search?q=${encodeURIComponent(cropName)}`);
+      const dbTemplates: CropTemplate[] = await dbRes.json();
+      const dbMatch = dbTemplates.find(t => t.name.toLowerCase() === cropName.toLowerCase() && t.variety.toLowerCase() === variety.toLowerCase());
+      // Fetch from AI (new advice endpoint)
+      const aiRes = await apiRequest(
+        "GET",
+        `/api/crop-templates/advice?cropName=${encodeURIComponent(cropName)}&variety=${encodeURIComponent(variety)}&context=${encodeURIComponent(context)}`
+      );
+      console.log('Advice API call params:', { cropName, variety, context });
+      const aiData = await aiRes.json();
+      // Prefer DB, fallback to AI
+      let notes = "";
+      let growingDays: number | undefined;
+      if (dbMatch) {
+        notes = dbMatch.specialInstructions || "";
+        growingDays = dbMatch.growingDays;
+      } else if (aiData) {
+        notes = aiData.specialInstructions || "";
+        growingDays = aiData.growingDays;
+      }
+      if (notes) setValue("notes", notes);
+      if (growingDays && typeof growingDays === 'number') {
+        const plantedDateStr = watch("plantedDate");
+        if (plantedDateStr && typeof plantedDateStr === 'string') {
+          try {
+            const plantedDate = new Date(plantedDateStr);
+            const harvestDate = new Date(plantedDate);
+            harvestDate.setDate(plantedDate.getDate() + growingDays);
+            const iso = harvestDate.toISOString();
+            if (iso && typeof iso === 'string') setValue("expectedHarvestDate", iso.split('T')[0]);
+          } catch {}
+        }
+      }
+    } catch (err) {
+      // ignore
+    } finally {
+      setVarietyLoading(false);
+    }
   };
 
   return (
@@ -257,15 +428,27 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Hidden field to sync cropName to name for Zod validation */}
           <input type="hidden" {...register("name")} value={watch("cropName")} />
+
+          <div>
+            <Label htmlFor="context">Context</Label>
+            <Input
+              id="context"
+              autoComplete="off"
+              {...register("context")}
+              placeholder="e.g., microgreens, field, hydroponic"
+              onBlur={handleNameOrVarietyBlur}
+            />
+          </div>
+
           <div>
             <Label htmlFor="cropName">Crop Name *</Label>
             <Input
               id="cropName"
               autoComplete="off"
               {...register("cropName")}
-              placeholder="e.g., Sweet Basil"
+              placeholder="e.g., Peas"
+              onBlur={handleNameOrVarietyBlur}
             />
             {errors.cropName && (
               <p className="text-sm text-red-600 mt-1">{errors.cropName.message}</p>
@@ -276,8 +459,10 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
             <Label htmlFor="variety">Variety</Label>
             <Input
               id="variety"
+              autoComplete="off"
               {...register("variety")}
-              placeholder="e.g., Genovese"
+              placeholder="e.g., Sugar Snap"
+              onBlur={handleNameOrVarietyBlur}
             />
           </div>
 

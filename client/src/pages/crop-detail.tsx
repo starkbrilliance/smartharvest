@@ -6,18 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, MapPin, Scissors, Clipboard, QrCode } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Scissors, Clipboard, QrCode, Trash2 } from "lucide-react";
 import EventModal from "@/components/event-modal";
 import QRModal from "@/components/qr-modal";
 import { useState } from "react";
 import type { Crop, Event } from "@shared/schema";
 import { getDaysUntilHarvest, getDaysSincePlanted, getGrowthProgress, getStatusColor, formatDateTime } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function CropDetail() {
   const [, params] = useRoute("/crop/:id");
   const [, setLocation] = useLocation();
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -26,6 +29,26 @@ export default function CropDetail() {
     queryKey: ["/api/crops", params?.id],
     queryFn: () => apiRequest("GET", `/api/crops/${params?.id}`).then(res => res.json()),
     enabled: !!params?.id,
+  });
+
+  const { data: subareaData } = useQuery({
+    queryKey: ["/api/grow-areas/subarea", cropData?.subareaId],
+    queryFn: async () => {
+      if (!cropData?.subareaId) return null;
+      const res = await apiRequest("GET", `/api/grow-areas/subareas/${cropData.subareaId}`);
+      return res.json();
+    },
+    enabled: !!cropData?.subareaId,
+  });
+
+  const { data: growAreaData } = useQuery({
+    queryKey: ["/api/grow-areas/area", cropData?.areaId],
+    queryFn: async () => {
+      if (!cropData?.areaId) return null;
+      const res = await apiRequest("GET", `/api/grow-areas/${cropData.areaId}`);
+      return res.json();
+    },
+    enabled: !!cropData?.areaId && !cropData?.subareaId,
   });
 
   const harvestMutation = useMutation({
@@ -52,6 +75,33 @@ export default function CropDetail() {
       });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (cropId: string) => {
+      const response = await apiRequest("DELETE", `/api/crops/${cropId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crops"] });
+      toast({
+        title: "Crop Deleted",
+        description: "Crop has been successfully deleted",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete crop. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    if (!cropData) return;
+    deleteMutation.mutate(cropData.id);
+  };
 
   if (isLoading) {
     return (
@@ -83,10 +133,10 @@ export default function CropDetail() {
   const crop = cropData;
   const events = cropData.events || [];
 
-  const daysUntilHarvest = getDaysUntilHarvest(crop.expectedHarvestDate);
-  const daysSincePlanted = getDaysSincePlanted(crop.plantedDate);
-  const growthProgress = getGrowthProgress(crop.plantedDate, crop.expectedHarvestDate);
-  const statusColor = getStatusColor(crop.status);
+  const daysUntilHarvest = cropData ? getDaysUntilHarvest(cropData.expectedHarvestDate) : 0;
+  const daysSincePlanted = cropData ? getDaysSincePlanted(cropData.plantedDate) : 0;
+  const growthProgress = cropData ? getGrowthProgress(cropData.plantedDate, cropData.expectedHarvestDate) : 0;
+  const statusColor = cropData ? getStatusColor(cropData.status) : "";
 
   const getEventTypeColor = (type: string) => {
     switch (type) {
@@ -101,90 +151,64 @@ export default function CropDetail() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setLocation('/')}
-                className="mr-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{crop.name}</h1>
-                <p className="text-gray-600">{crop.variety || "No variety specified"}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge className={`${statusColor}`}>
-                {crop.status
-                  ? crop.status.charAt(0).toUpperCase() + crop.status.slice(1)
-                  : "Unknown"}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsQRModalOpen(true)}
-              >
-                <QrCode className="h-4 w-4 mr-2" />
-                QR Code
-              </Button>
-            </div>
-          </div>
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex items-center mb-6">
+          <Button
+            variant="ghost"
+            className="mr-2"
+            onClick={() => setLocation("/")}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold">{cropData?.name}</h1>
+          {cropData?.variety && (
+            <span className="ml-2 text-gray-500">({cropData.variety})</span>
+          )}
         </div>
-      </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Crop Information
-                </CardTitle>
+                <CardTitle>Crop Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">Location</p>
-                    <p className="font-medium flex items-center">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {crop.location}
+                    <Label>Location</Label>
+                    <p className="text-sm text-gray-600">
+                      {subareaData
+                        ? `${subareaData.name}`
+                        : growAreaData
+                        ? `${growAreaData.name}`
+                        : "No location specified"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Days Since Planted</p>
-                    <p className="font-medium">{daysSincePlanted} days</p>
+                    <Label>Status</Label>
+                    <Badge className={statusColor}>
+                      {cropData?.status.charAt(0).toUpperCase() + cropData?.status.slice(1)}
+                    </Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Days Until Harvest</p>
-                    <p className={`font-medium ${
-                      daysUntilHarvest <= 0 ? "text-red-600" :
-                      daysUntilHarvest <= 7 ? "text-blue-600" : "text-green-600"
-                    }`}>
-                      {daysUntilHarvest <= 0 ? "Overdue" : `${daysUntilHarvest} days`}
+                    <Label>Planted Date</Label>
+                    <p className="text-sm text-gray-600">
+                      {cropData?.plantedDate ? formatDateTime(cropData.plantedDate) : "Not specified"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Growth Progress</p>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={growthProgress} className="flex-1 h-2" />
-                      <span className="text-sm font-medium">{growthProgress}%</span>
-                    </div>
+                    <Label>Expected Harvest</Label>
+                    <p className="text-sm text-gray-600">
+                      {cropData?.expectedHarvestDate ? formatDateTime(cropData.expectedHarvestDate) : "Not specified"}
+                    </p>
                   </div>
                 </div>
 
-                {crop.notes && (
+                {cropData?.notes && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Notes</p>
-                    <p className="text-sm bg-gray-50 p-3 rounded-lg">{crop.notes}</p>
+                    <Label>Notes</Label>
+                    <p className="text-sm text-gray-600 mt-1">{cropData.notes}</p>
                   </div>
                 )}
               </CardContent>
@@ -226,10 +250,10 @@ export default function CropDetail() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {crop.status === "ready" || daysUntilHarvest <= 0 ? (
+                {cropData?.status === "ready" || daysUntilHarvest <= 0 ? (
                   <Button
                     className="w-full bg-primary text-white hover:bg-green-600"
-                    onClick={() => harvestMutation.mutate(crop.id)}
+                    onClick={() => harvestMutation.mutate(cropData.id)}
                     disabled={harvestMutation.isPending}
                   >
                     <Scissors className="h-4 w-4 mr-2" />
@@ -245,18 +269,28 @@ export default function CropDetail() {
                   <Clipboard className="h-4 w-4 mr-2" />
                   Log Event
                 </Button>
+
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {deleteMutation.isPending ? "Deleting..." : "Delete Crop"}
+                </Button>
               </CardContent>
             </Card>
 
-            {crop.imageUrl && (
+            {cropData?.imageUrl && (
               <Card>
                 <CardHeader>
                   <CardTitle>Photo</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <img
-                    src={crop.imageUrl}
-                    alt={crop.name}
+                    src={cropData.imageUrl}
+                    alt={cropData.name}
                     className="w-full h-48 object-cover rounded-lg"
                   />
                 </CardContent>
@@ -278,6 +312,33 @@ export default function CropDetail() {
         onClose={() => setIsQRModalOpen(false)}
         crop={crop}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Crop</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>Are you sure you want to delete this crop? This action cannot be undone.</p>
+          </div>
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

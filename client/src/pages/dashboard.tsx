@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sprout, Bell, Plus, TriangleAlert } from "lucide-react";
+import { Sprout, Bell, Plus, TriangleAlert, Settings } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import StatsCards from "@/components/stats-cards";
 import CropCard from "@/components/crop-card";
 import EventModal from "@/components/event-modal";
@@ -112,7 +113,7 @@ export default function Dashboard() {
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
-      localStorage.removeItem('growtrack_session');
+      localStorage.removeItem('smartharvest_session');
       setLocation('/login');
       toast({
         title: "Logged Out",
@@ -127,10 +128,11 @@ export default function Dashboard() {
   const filteredCrops = currentView === "overview"
     ? crops
     : crops.filter(crop => {
-        // Find the subarea for this crop
+        // Show crops that either:
+        // 1. Have a subarea that belongs to the selected grow area
+        // 2. Are directly assigned to the selected grow area
         const sub = subareas.find(s => s.id === crop.subareaId);
-        // Only show crops whose subarea belongs to the selected grow area
-        return sub && sub.growAreaId === currentView;
+        return (sub && sub.growAreaId === currentView) || crop.areaId === currentView;
       });
 
   const urgentTasks = crops.filter(crop => {
@@ -158,7 +160,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Sprout className="text-primary text-2xl mr-3 h-8 w-8" />
-              <h1 className="text-xl font-bold text-gray-900">GrowTrack</h1>
+              <h1 className="text-xl font-bold text-gray-900">SmartHarvest</h1>
             </div>
             <div className="flex items-center space-x-3">
               <Button variant="ghost" size="sm" className="relative">
@@ -169,6 +171,26 @@ export default function Dashboard() {
                   </Badge>
                 )}
               </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48">
+                  <div className="space-y-2">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setLocation("/grow-areas");
+                      }}
+                    >
+                      Grow Areas
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Button
                 className="bg-primary text-white hover:bg-green-600"
                 onClick={() => setIsAddCropModalOpen(true)}

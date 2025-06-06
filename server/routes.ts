@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertCropSchema, insertEventSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import { getCropAdvice } from "./lib/openai";
 
 const authenticateSession = async (req: any, res: any, next: any) => {
   const sessionToken = req.headers.authorization?.replace('Bearer ', '');
@@ -27,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { password } = req.body;
 
-      if (password !== (process.env.SHARED_PASSWORD || "growtrack2024")) {
+      if (password !== (process.env.SHARED_PASSWORD || "smartharvest2025")) {
         return res.status(401).json({ message: "Invalid password" });
       }
 
@@ -64,7 +65,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crops = await storage.getCrops();
       res.json(crops);
     } catch (error) {
-      console.error("Error fetching crops:", error); // <-- Add this line
+      console.error("Error in GET /api/crops:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
       res.status(500).json({ message: "Failed to fetch crops" });
     }
   });
@@ -202,6 +206,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/grow-areas/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const area = await storage.getGrowAreaById(id);
+      if (!area) return res.status(404).json({ message: "Grow area not found" });
+      res.json(area);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch grow area" });
+    }
+  });
+
   // Subareas endpoints
   app.get("/api/grow-areas/:growAreaId/subareas", authenticateSession, async (req, res) => {
     try {
@@ -245,6 +260,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Subarea deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete subarea" });
+    }
+  });
+
+  // Crop Template routes
+  app.get("/api/crop-templates", authenticateSession, async (req, res) => {
+    try {
+      const templates = await storage.getCropTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch crop templates" });
+    }
+  });
+
+  app.get("/api/crop-templates/search", authenticateSession, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      const templates = await storage.searchCropTemplates(q);
+      res.json(templates);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to search crop templates" });
+    }
+  });
+
+  app.post("/api/crop-templates", authenticateSession, async (req, res) => {
+    try {
+      const { name, variety, growingDays, specialInstructions } = req.body;
+      if (!name || !variety || !growingDays) {
+        return res.status(400).json({ message: "Name, variety, and growing days are required" });
+      }
+      const template = await storage.createCropTemplate({
+        name,
+        variety,
+        growingDays,
+        specialInstructions,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create crop template" });
+    }
+  });
+
+  app.patch("/api/crop-templates/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const template = await storage.updateCropTemplate(id, updateData);
+      if (!template) {
+        return res.status(404).json({ message: "Crop template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update crop template" });
+    }
+  });
+
+  app.delete("/api/crop-templates/:id", authenticateSession, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteCropTemplate(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Crop template not found" });
+      }
+      res.json({ message: "Crop template deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete crop template" });
+    }
+  });
+
+  // AI-powered crop suggestions
+  app.get("/api/crop-templates/ai-suggestions", authenticateSession, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      // This endpoint is deprecated, but keep the old logic for now
+      res.json({ suggestions: [] });
+    } catch (error) {
+      console.error('Error getting AI suggestions:', error);
+      res.status(500).json({ message: "Failed to get AI suggestions" });
+    }
+  });
+
+  // AI-powered crop advice for a specific crop and variety
+  app.get("/api/crop-templates/advice", authenticateSession, async (req, res) => {
+    try {
+      const { cropName, variety, context } = req.query;
+      if (!cropName || typeof cropName !== 'string' || !variety || typeof variety !== 'string') {
+        return res.status(400).json({ message: "Both cropName and variety are required" });
+      }
+      const advice = await getCropAdvice({
+        cropName,
+        variety,
+        context: typeof context === 'string' ? context : undefined
+      });
+      if (!advice) {
+        return res.status(500).json({ message: "Failed to get AI advice" });
+      }
+      res.json(advice);
+    } catch (error) {
+      console.error('Error getting AI advice:', error);
+      res.status(500).json({ message: "Failed to get AI advice" });
     }
   });
 
