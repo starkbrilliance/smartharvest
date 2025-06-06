@@ -219,7 +219,7 @@ export default function Dashboard() {
               }`}
               onClick={() => setCurrentView("overview")}
             >
-              Overview
+              All
             </button>
             {growAreas.map((area) => (
               <button
