@@ -11,7 +11,7 @@ import EventModal from "@/components/event-modal";
 import QRModal from "@/components/qr-modal";
 import { useState } from "react";
 import type { Crop, Event } from "@shared/schema";
-import { getDaysUntilHarvest, getDaysSincePlanted, getGrowthProgress, getStatusColor, formatDateTime } from "@/lib/utils";
+import { getDaysUntilHarvest, getDaysSincePlanted, getGrowthProgress, getStatusColor, formatDateTime, formatDate } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import MaintenanceSchedule from "@/components/maintenance-schedule";
@@ -216,13 +216,13 @@ export default function CropDetail() {
                   <div>
                     <Label>Planted Date</Label>
                     <p className="text-sm text-gray-600">
-                      {cropData?.plantedDate ? formatDateTime(cropData.plantedDate) : "Not specified"}
+                      {cropData?.plantedDate ? formatDate(cropData.plantedDate) : "Not specified"}
                     </p>
                   </div>
                   <div>
                     <Label>Expected Harvest</Label>
                     <p className="text-sm text-gray-600">
-                      {cropData?.expectedHarvestDate ? formatDateTime(cropData.expectedHarvestDate) : "Not specified"}
+                      {cropData?.expectedHarvestDate ? formatDate(cropData.expectedHarvestDate) : "Not specified"}
                     </p>
                   </div>
                 </div>
