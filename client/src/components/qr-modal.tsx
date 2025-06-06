@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { QrCode } from "lucide-react";
 import type { Crop } from "@shared/schema";
 import { generateCropUrl } from "@/lib/utils";
+import { QRCodeSVG } from "qrcode.react";
 
 interface QRModalProps {
   isOpen: boolean;
@@ -14,33 +15,65 @@ export default function QRModal({ isOpen, onClose, crop }: QRModalProps) {
   const cropUrl = crop ? generateCropUrl(crop.id) : "";
 
   const downloadQR = () => {
-    // This would integrate with a QR code generation library
-    console.log("Downloading QR code for:", cropUrl);
+    // Create a canvas element
+    const canvas = document.createElement("canvas");
+    const svg = document.querySelector(".qr-code svg");
+    if (!svg) return;
+
+    // Convert SVG to canvas
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `crop-${crop?.id}-qr.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      });
+    };
+    img.src = url;
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-xs">
         <DialogHeader>
-          <DialogTitle>Crop QR Code</DialogTitle>
+          <DialogTitle>Print QR Code</DialogTitle>
         </DialogHeader>
-        
         <div className="text-center">
-          <div className="bg-gray-100 p-4 rounded-lg mb-4">
-            <div className="w-48 h-48 mx-auto bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center">
-              <QrCode className="text-6xl text-gray-400 h-16 w-16" />
+          <div className="bg-white p-2 rounded-lg mb-2 flex flex-col items-center">
+            <div className="qr-code mb-2" style={{ width: 192, height: 192, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {cropUrl ? (
+                <QRCodeSVG
+                  value={cropUrl}
+                  size={180}
+                  level="H"
+                  includeMargin={false}
+                />
+              ) : (
+                <QrCode className="text-6xl text-gray-400 h-16 w-16" />
+              )}
             </div>
-          </div>
-          
-          <p className="text-sm text-gray-600 mb-4 break-all">{cropUrl}</p>
-          
-          <div className="flex space-x-3">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
-              Close
-            </Button>
-            <Button 
-              className="flex-1 bg-primary hover:bg-green-600 text-white"
+            <Button
+              style={{ width: 200 }}
+              className="bg-primary hover:bg-green-600 text-white"
               onClick={downloadQR}
+              disabled={!cropUrl}
             >
               Download
             </Button>
