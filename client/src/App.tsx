@@ -15,7 +15,7 @@ queryClient.setDefaultOptions({
   queries: {
     ...queryClient.getDefaultOptions().queries,
     queryFn: async ({ queryKey }) => {
-      const sessionToken = localStorage.getItem('growtrack_session');
+      const sessionToken = localStorage.getItem('smartharvest_session');
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
         headers: sessionToken ? {
@@ -24,7 +24,7 @@ queryClient.setDefaultOptions({
       });
 
       if (res.status === 401) {
-        localStorage.removeItem('growtrack_session');
+        localStorage.removeItem('smartharvest_session');
         window.location.href = '/login';
         throw new Error('Unauthorized');
       }

@@ -19,10 +19,10 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (data) => {
-      localStorage.setItem('growtrack_session', data.sessionToken);
+      localStorage.setItem('smartharvest_session', data.sessionToken);
       setLocation('/');
       toast({
-        title: "Welcome to GrowTrack",
+        title: "Welcome to SmartHarvest",
         description: "Successfully authenticated",
       });
     },
@@ -48,10 +48,10 @@ export default function Login() {
         <CardContent className="pt-8">
           <div className="text-center mb-6">
             <Sprout className="text-primary text-4xl mb-4 mx-auto h-12 w-12" />
-            <h1 className="text-2xl font-bold text-gray-900">GrowTrack Access</h1>
+            <h1 className="text-2xl font-bold text-gray-900">SmartHarvest Access</h1>
             <p className="text-gray-600 mt-2">Enter shared password to continue</p>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               type="password"
@@ -60,9 +60,9 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loginMutation.isPending}
             />
-            
-            <Button 
-              type="submit" 
+
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-green-600 text-white"
               disabled={loginMutation.isPending}
             >

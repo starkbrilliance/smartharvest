@@ -26,7 +26,7 @@
 2. Set up a Neon database and add your `DATABASE_URL` to a `.env` file
 3. Run migrations: `npm run db:push`
 4. Start the app: `npm run dev`
-5. Log in with the default password (`growtrack2024`) or set your own via `SHARED_PASSWORD` in `.env`
+5. Log in with the default password (`smartharvest2025`) or set your own via `SHARED_PASSWORD` in `.env`
 
 ---
 

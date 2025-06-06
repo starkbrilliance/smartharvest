@@ -12,7 +12,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const sessionToken = localStorage.getItem('growtrack_session');
+  const sessionToken = localStorage.getItem('smartharvest_session');
   const headers: Record<string, string> = {
     ...(data ? { "Content-Type": "application/json" } : {}),
     ...(sessionToken ? { "Authorization": `Bearer ${sessionToken}` } : {}),

@@ -8,9 +8,9 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children }: AuthGuardProps) {
   const [, setLocation] = useLocation();
-  
-  const sessionToken = localStorage.getItem('growtrack_session');
-  
+
+  const sessionToken = localStorage.getItem('smartharvest_session');
+
   useEffect(() => {
     if (!sessionToken) {
       setLocation('/login');
