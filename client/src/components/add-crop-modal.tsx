@@ -393,6 +393,15 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
           </p>
         </DialogHeader>
 
+        {varietyLoading && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Fetching crop information...</p>
+            </div>
+          </div>
+        )}
+
         {areasError && (
           <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">
             {areasError}
@@ -457,13 +466,20 @@ export default function AddCropModal({ isOpen, onClose }: AddCropModalProps) {
 
           <div>
             <Label htmlFor="variety">Variety</Label>
-            <Input
-              id="variety"
-              autoComplete="off"
-              {...register("variety")}
-              placeholder="e.g., Sugar Snap"
-              onBlur={handleNameOrVarietyBlur}
-            />
+            <div className="relative">
+              <Input
+                id="variety"
+                autoComplete="off"
+                {...register("variety")}
+                placeholder="e.g., Sugar Snap"
+                onBlur={handleNameOrVarietyBlur}
+              />
+              {varietyLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
